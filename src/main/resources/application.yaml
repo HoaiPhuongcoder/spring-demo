@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: demo
+  datasource:
+    url: jdbc:postgresql://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
+    username: postgres.dkyrovftyeewennuwboo
+    password: Phuonglovenhu123
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    show-sql: true
+    database: postgresql
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 2000
+        one-indexed-parameters: false
+springdoc:
+  swagger-ui:
+    path: /docs
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+  api-docs:
+    path: /v3/api-docs
