@@ -1,6 +1,11 @@
 spring:
   application:
     name: demo
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+    # Unknown languages fall back to messages.properties (English), not the server's locale
+    fallback-to-system-locale: false
   datasource:
     url: jdbc:postgresql://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
     username: postgres.dkyrovftyeewennuwboo
@@ -22,6 +27,7 @@ spring:
         max-page-size: 2000
         one-indexed-parameters: false
 springdoc:
+  default-produces-media-type: application/json
   swagger-ui:
     path: /docs
     operations-sorter: method

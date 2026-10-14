@@ -1,7 +1,9 @@
 package com.hoaiphuong.demo.common.exception;
 
+import com.hoaiphuong.demo.common.i18n.Messages;
 import com.hoaiphuong.demo.common.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
@@ -20,83 +22,91 @@ import java.util.List;
 
 @RestControllerAdvice
 @Slf4j
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final Messages messages;
 
     private ResponseEntity<ApiResponse<Void>> build(ErrorCode ec, String message, List<ApiResponse.FieldError> errors) {
         return ResponseEntity.status(ec.getStatus()).body(ApiResponse.error(ec, message, errors));
     }
 
-    // Lỗi nghiệp vụ do mình chủ động ném
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
-        return build(ex.getErrorCode(), ex.getMessage(), null);
+    private ResponseEntity<ApiResponse<Void>> build(ErrorCode ec, List<ApiResponse.FieldError> errors) {
+        return build(ec, messages.get(ec), errors);
     }
 
-    // @Valid trên @RequestBody
+    // Business errors thrown on purpose by our code
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
+        String message = ex.isCustomMessage() ? ex.getMessage() : messages.get(ex.getErrorCode());
+        return build(ex.getErrorCode(), message, null);
+    }
+
+    // @Valid on @RequestBody / @ModelAttribute
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleBodyValidation(MethodArgumentNotValidException ex) {
         List<ApiResponse.FieldError> errors = ex.getBindingResult().getFieldErrors().stream()
-                .map(f -> new ApiResponse.FieldError(f.getField(), f.getDefaultMessage()))
+                .map(f -> new ApiResponse.FieldError(f.getField(), messages.get(f)))
                 .toList();
-        return build(ErrorCode.VALIDATION_ERROR, ErrorCode.VALIDATION_ERROR.getMessage(), errors);
+        return build(ErrorCode.VALIDATION_ERROR, errors);
     }
 
-    // @Validated trên @RequestParam / @PathVariable
+    // @Validated on @RequestParam / @PathVariable
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConstraint(ConstraintViolationException ex) {
         List<ApiResponse.FieldError> errors = ex.getConstraintViolations().stream()
                 .map(v -> new ApiResponse.FieldError(v.getPropertyPath().toString(), v.getMessage()))
                 .toList();
-        return build(ErrorCode.VALIDATION_ERROR, ErrorCode.VALIDATION_ERROR.getMessage(), errors);
+        return build(ErrorCode.VALIDATION_ERROR, errors);
     }
 
-    // JSON sai cú pháp, sai kiểu dữ liệu
+    // Invalid JSON syntax or wrong data types in the body
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException ex) {
-        return build(ErrorCode.MALFORMED_REQUEST, ErrorCode.MALFORMED_REQUEST.getMessage(), null);
+        return build(ErrorCode.MALFORMED_REQUEST, null);
     }
 
-    // Thiếu tham số bắt buộc
+    // Missing required parameter
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingParam(MissingServletRequestParameterException ex) {
-        return build(ErrorCode.VALIDATION_ERROR, "Thiếu tham số '" + ex.getParameterName() + "'", null);
+        return build(ErrorCode.VALIDATION_ERROR, messages.get("error.param.missing", ex.getParameterName()), null);
     }
 
-    // Sai kiểu tham số, ví dụ ?status=ABC không thuộc enum
+    // Wrong parameter type, e.g. ?status=ABC that is not an enum value
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-        return build(ErrorCode.VALIDATION_ERROR, "Tham số '" + ex.getName() + "' không hợp lệ", null);
+        return build(ErrorCode.VALIDATION_ERROR, messages.get("error.param.invalid", ex.getName()), null);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
-        return build(ErrorCode.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED.getMessage(), null);
+        return build(ErrorCode.METHOD_NOT_ALLOWED, null);
     }
 
-    // Đường dẫn không tồn tại (Spring 6.1+)
+    // Unknown path (Spring 6.1+)
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNoResource(NoResourceFoundException ex) {
-        return build(ErrorCode.RESOURCE_NOT_FOUND, ErrorCode.RESOURCE_NOT_FOUND.getMessage(), null);
+        return build(ErrorCode.RESOURCE_NOT_FOUND, null);
     }
 
-    // Quan trọng: @PreAuthorize ném lỗi này từ bên trong controller,
-    // nếu không bắt riêng thì sẽ rơi xuống handler Exception và thành lỗi 500
+    // Important: @PreAuthorize throws this from inside the controller;
+    // without a dedicated handler it would fall through to the generic handler and become a 500
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
-        return build(ErrorCode.FORBIDDEN, ErrorCode.FORBIDDEN.getMessage(), null);
+        return build(ErrorCode.FORBIDDEN, null);
     }
 
-    // Vi phạm ràng buộc dữ liệu (trùng khóa unique...) mà service chưa kiểm tra trước
+    // Constraint violation (duplicate unique key...) that the service did not check beforehand
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
         log.warn("Data integrity violation", ex);
-        return build(ErrorCode.VALIDATION_ERROR, "Dữ liệu vi phạm ràng buộc", null);
+        return build(ErrorCode.VALIDATION_ERROR, messages.get("error.data-integrity"), null);
     }
 
-    // Mọi lỗi còn lại: ghi log đầy đủ, KHÔNG lộ chi tiết ra ngoài
+    // Everything else: log the full error, do NOT leak details to the client
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleOther(Exception ex) {
         log.error("Unhandled exception", ex);
-        return build(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.getMessage(), null);
+        return build(ErrorCode.INTERNAL_ERROR, null);
     }
 }
