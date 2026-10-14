@@ -5,25 +5,33 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
 
+/**
+ * Error codes returned to clients. Messages are localized: the text for each code lives in
+ * {@code i18n/messages*.properties} under the key {@link #getMessageKey()}.
+ */
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {
-    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi hệ thống, vui lòng thử lại sau"),
-    VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ"),
-    MALFORMED_REQUEST(HttpStatus.BAD_REQUEST, "Nội dung yêu cầu không đúng định dạng"),
-    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy tài nguyên"),
-    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "Phương thức không được hỗ trợ"),
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
+    VALIDATION_ERROR(HttpStatus.BAD_REQUEST),
+    MALFORMED_REQUEST(HttpStatus.BAD_REQUEST),
+    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
+    INVALID_CURSOR(HttpStatus.BAD_REQUEST),
 
-    // Xác thực, phân quyền
-    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Chưa đăng nhập hoặc phiên đã hết hạn"),
-    FORBIDDEN(HttpStatus.FORBIDDEN, "Không có quyền truy cập"),
+    // Authentication, authorization
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED),
+    FORBIDDEN(HttpStatus.FORBIDDEN),
 
-    // Người dùng
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"),
-    EMAIL_EXISTED(HttpStatus.CONFLICT, "Email đã tồn tại");
+    // User
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND),
+    EMAIL_EXISTED(HttpStatus.CONFLICT);
 
 
 
     private final HttpStatus status;
-    private final String message;
+
+    public String getMessageKey() {
+        return "error." + name();
+    }
 }
